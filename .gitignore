@@ -1,0 +1,6 @@
+# Ignore Text Editor Files
+/.sublime**
+.idea/
+
+# Mac OSX File System Annoyances
+.DS_Store

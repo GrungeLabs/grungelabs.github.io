@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en" prefix="og: http://ogp.me/ns# fb: https://www.facebook.com/2008/fbml">
+<head>
+    <title>HA OpenLDAP on Debian (Squeeze) - Grunge Labs</title>
+    <!-- Using the latest rendering mode for IE -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
+<link rel="canonical" href="https://grungelabs.com/ha-openldap-debian-squeeze.html">
+
+        <meta name="author" content="Fahd Sultan" />
+        <meta name="keywords" content="openldap,syncrepl,ppolicy,ldaps" />
+        <meta name="description" content="A reference for configuring a Highly Available LDAP service on Debian 6, Squeeze, using openLDAP with openSSL, syncrepl, password policies, Linux-HA, and some passing references to monitoring it all." />
+
+        <meta property="og:site_name" content="Grunge Labs" />
+        <meta property="og:type" content="article"/>
+        <meta property="og:title" content="HA OpenLDAP on Debian (Squeeze)"/>
+        <meta property="og:url" content="https://grungelabs.com/ha-openldap-debian-squeeze.html"/>
+        <meta property="og:description" content="A reference for configuring a Highly Available LDAP service on Debian 6, Squeeze, using openLDAP with openSSL, syncrepl, password policies, Linux-HA, and some passing references to monitoring it all."/>
+        <meta property="article:published_time" content="2012-06-08" />
+            <meta property="article:section" content="auth" />
+            <meta property="article:tag" content="openldap" />
+            <meta property="article:tag" content="syncrepl" />
+            <meta property="article:tag" content="ppolicy" />
+            <meta property="article:tag" content="ldaps" />
+            <meta property="article:author" content="Fahd Sultan" />
+
+
+
+    <!-- Bootstrap -->
+        <link rel="stylesheet" href="https://grungelabs.com/theme/css/bootstrap.flatly.min.css" type="text/css"/>
+    <link href="https://grungelabs.com/theme/css/font-awesome.min.css" rel="stylesheet">
+
+    <link href="https://grungelabs.com/theme/css/pygments/default.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://grungelabs.com/theme/css/style.css" type="text/css"/>
+        <link href="https://grungelabs.com/static/custom.css" rel="stylesheet">
+
+
+
+</head>
+<body>
+
+<div class="navbar navbar-default navbar-fixed-top" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-ex1-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a href="https://grungelabs.com/" class="navbar-brand">
+Grunge Labs            </a>
+        </div>
+        <div class="collapse navbar-collapse navbar-ex1-collapse">
+            <ul class="nav navbar-nav">
+                         <li><a href="https://grungelabs.com/pages/about.html">
+                             About
+                          </a></li>
+                         <li><a href="https://grungelabs.com/pages/home.html">
+                             Home
+                          </a></li>
+            </ul>
+            <ul class="nav navbar-nav navbar-right">
+            </ul>
+        </div>
+        <!-- /.navbar-collapse -->
+    </div>
+</div> <!-- /.navbar -->
+
+<!-- Banner -->
+<!-- End Banner -->
+
+<!-- Content Container -->
+<div class="container">
+    <div class="row">
+        <div class="col-sm-9">
+    <section id="content">
+        <article>
+            <header class="page-header">
+                <h1>
+                    <a href="https://grungelabs.com/ha-openldap-debian-squeeze.html"
+                       rel="bookmark"
+                       title="Permalink to HA OpenLDAP on Debian (Squeeze)">
+                        HA OpenLDAP on Debian (Squeeze)
+                    </a>
+                </h1>
+            </header>
+            <div class="entry-content">
+                <div class="panel">
+                    <div class="panel-body">
+<footer class="post-info">
+    <span class="label label-default">Date</span>
+    <span class="published">
+        <i class="fa fa-calendar"></i><time datetime="2012-06-08T00:00:00-04:00"> Fri 08 June 2012</time>
+    </span>
+
+
+            <span class="label label-default">By</span>
+            <a href="https://grungelabs.com/author/fahd-sultan.html"><i class="fa fa-user"></i> Fahd Sultan</a>
+
+        <span class="label label-default">Category</span>
+        <a href="https://grungelabs.com/category/auth.html">auth</a>
+
+
+<span class="label label-default">Tags</span>
+	<a href="https://grungelabs.com/tag/openldap.html">openldap</a>
+        /
+	<a href="https://grungelabs.com/tag/syncrepl.html">syncrepl</a>
+        /
+	<a href="https://grungelabs.com/tag/ppolicy.html">ppolicy</a>
+        /
+	<a href="https://grungelabs.com/tag/ldaps.html">ldaps</a>
+    
+</footer><!-- /.post-info -->                    </div>
+                </div>
+                <p><strong>An Updated version of this document for Wheezy is availible at ha-openldap-debian-wheezy.html.</strong></p>
+<blockquote>
+<p><strong>A reference for configuring a Highly Available LDAP service on Debian 6, Squeeze, using openLDAP with openSSL, syncrepl, password policies, Linux-HA, and some passing references to monitoring it all.</strong></p>
+</blockquote>
+<p>This doc assumes that the reader has a basic familiarity with LDAP - openLDAP specifically, openSSL, heartbeat, 
+Sample files and commands are provided inline. These are almost exactly what I used and ran - with some information redacted. While links provided for references they may be stale - you are encouraged to use a search engine for updated sources.</p>
+<p>This information is a summary of various online sources that address parts of the desired system.  Almost none of them are based on the new openLDAP configuration paradigm.  </p>
+<ul>
+<li><a href="http://www.openldap.org/doc/admin23/slapdconf2.html">OpenLDAP Software 2.3 Administrator's Guide, "Configuring slapd", http://www.openldap.org/doc/admin23/slapdconf2.html</a></li>
+<li><a href="http://www.zytrax.com/books/ldap/ch6/">LDAP for Rocket Scientists "LDAP Configuration", http://www.zytrax.com/books/ldap/ch6/</a></li>
+</ul>
+<h2>Server setup</h2>
+<p>Launch two servers, ldap01 and ldap02
+reserve a third internal address for the HA ip that clients will connect to. create a DNS entry for ldap.example.tld to this ip.</p>
+<p>Iptables or other firewalls</p>
+<p>We will only allow ldaps connections so tcp/636 should be permitted. </p>
+<h2>Install openLDAP</h2>
+<p>Execute these steps on both the master and the slave nodes.</p>
+<div class="highlight"><pre><span></span><code><span class="c1">//install ldap</span>
+<span class="n">apt</span><span class="o">-</span><span class="k">get</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">ldap</span><span class="o">-</span><span class="n">utils</span><span class="w"> </span><span class="n">slapd</span>
+<span class="c1">//gnutls-bin for debugging tls</span>
+<span class="n">apt</span><span class="o">-</span><span class="k">get</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">gnutls</span><span class="o">-</span><span class="n">bin</span>
+</code></pre></div>
+
+<h4>Basic Setup</h4>
+<p>Installing the package prompts for the admin password, the domain is grabbed from the FQDN. You'll still want to setup the admin password for the cn=config RootDN.</p>
+<div class="highlight"><pre><span></span><code><span class="c1">//locate the DN with the RootDN entry</span>
+<span class="n">ldapsearch</span><span class="w"> </span><span class="o">-</span><span class="n">LLL</span><span class="w"> </span><span class="o">-</span><span class="n">Y</span><span class="w"> </span><span class="n">EXTERNAL</span><span class="w"> </span><span class="o">-</span><span class="n">H</span><span class="w"> </span><span class="n">ldapi</span><span class="p">:</span><span class="c1">/// -b  cn=config olcRootDN=cn=admin,cn=config dn olcRootDN olcRootPW</span>
+
+<span class="c1">//generate a password</span>
+<span class="n">slappasswd</span><span class="w"> </span><span class="o">-</span><span class="n">h</span><span class="w"> </span><span class="p">{</span><span class="n">MD5</span><span class="p">}</span>
+</code></pre></div>
+
+<h4>Admin password for config db</h4>
+<p>Create an ldif file 'olcRootPW.ldif'</p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">olcDatabase</span><span class="o">={</span><span class="mi">0</span><span class="o">}</span><span class="n">config</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">changetype</span><span class="o">:</span><span class="w"> </span><span class="n">modify</span>
+<span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">olcRootPW</span>
+<span class="n">olcRootPW</span><span class="o">:</span><span class="w"> </span><span class="o">{</span><span class="n">MD5</span><span class="o">}</span><span class="n">d5heCAABBBB999G00usa</span><span class="o">==</span>
+</code></pre></div>
+
+<p>Apply the ldif
+    ldapmodify -Y EXTERNAL -H ldapi:/// -f ./olcRootPW.ldif</p>
+<p>References:
+  http://www.saruman.biz/wiki/index.php/OpenLDAP</p>
+<h4>Convert the old format schema</h4>
+<p>Execute these steps on the master node. The schemata will get replicated to the slave.</p>
+<p>Collect all schemata that you may need.</p>
+<p>For per-host login acl include the ldapns schema include in the libpam-ldap package. <a href="http://wiki.debian.org/LDAP/PAM">Debian Wiki, "Allowing logins on a per-host basis", http://wiki.debian.org/LDAP/PAM</a></p>
+<p>Create a file <code>convert_schemata.conf</code></p>
+<p><em>ldapns.schema was copied from /usr/share/doc/libpam-ldap/ldapns.schema, the rest were already there.</em></p>
+<div class="highlight"><pre><span></span><code><span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">corba</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">core</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">cosine</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">duaconf</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">dyngroup</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">inetorgperson</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">java</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">misc</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">nis</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">openldap</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">pmi</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">ppolicy</span>.<span class="nv">schema</span>
+<span class="k">include</span><span class="w"> </span><span class="o">/</span><span class="nv">etc</span><span class="o">/</span><span class="nv">ldap</span><span class="o">/</span><span class="nv">schema</span><span class="o">/</span><span class="nv">ldapns</span>.<span class="nv">schema</span>
+</code></pre></div>
+
+<p><em>You'll probably not need them all but there are a few dependencies. ldapns.schema depends on cosine.schema so add it last.</em></p>
+<p>Run <code>slaptest -f  convert_schema.conf -F ./ldif_output/</code></p>
+<p>If all goes well you'll find your cn=config formatted schemata in <code>./ldif_output/cn\=config/cn\=schema</code>. We will import these later. </p>
+<p>But first you'll need to edit them:</p>
+<ol>
+<li>remove all line including and after 'structuralObjectClass: olcSchemaConfig'. </li>
+<li>remove the  '{NN}' from the top lines</li>
+<li>add 'cn=schema,cn=config' to the 'dn' line 'dn: cn=ldapns'</li>
+</ol>
+<p>My <code>cn\=\{12\}ldapns.ldif</code> file</p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">cn</span><span class="o">=</span><span class="n">ldapns</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">schema</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">olcSchemaConfig</span>
+<span class="n">cn</span><span class="o">:</span><span class="w"> </span><span class="n">ldapns</span>
+<span class="n">olcAttributeTypes</span><span class="o">:</span><span class="w"> </span><span class="o">{</span><span class="mi">0</span><span class="o">}(</span><span class="w"> </span><span class="mf">1.3</span><span class="o">.</span><span class="mf">6.1</span><span class="o">.</span><span class="mf">4.1</span><span class="o">.</span><span class="mf">5322.17</span><span class="o">.</span><span class="mf">2.1</span><span class="w"> </span><span class="n">NAME</span><span class="w"> </span><span class="s1">&#39;authorizedService&#39;</span><span class="w"> </span><span class="n">DESC</span>
+<span class="w"> </span><span class="s1">&#39;IANA GSS-API authorized service name&#39;</span><span class="w"> </span><span class="n">EQUALITY</span><span class="w"> </span><span class="n">caseIgnoreMatch</span><span class="w"> </span><span class="n">SYNTAX</span><span class="w"> </span><span class="mf">1.3</span><span class="o">.</span><span class="mi">6</span><span class="o">.</span>
+<span class="w"> </span><span class="mf">1.4</span><span class="o">.</span><span class="mf">1.1466</span><span class="o">.</span><span class="mf">115.121</span><span class="o">.</span><span class="mf">1.15</span><span class="o">{</span><span class="mi">256</span><span class="o">}</span><span class="w"> </span><span class="o">)</span>
+<span class="n">olcObjectClasses</span><span class="o">:</span><span class="w"> </span><span class="o">{</span><span class="mi">0</span><span class="o">}(</span><span class="w"> </span><span class="mf">1.3</span><span class="o">.</span><span class="mf">6.1</span><span class="o">.</span><span class="mf">4.1</span><span class="o">.</span><span class="mf">5322.17</span><span class="o">.</span><span class="mf">1.1</span><span class="w"> </span><span class="n">NAME</span><span class="w"> </span><span class="s1">&#39;authorizedServiceObject&#39;</span>
+<span class="w"> </span><span class="n">DESC</span><span class="w"> </span><span class="s1">&#39;Auxiliary object class for adding authorizedService attribute&#39;</span><span class="w"> </span><span class="n">SUP</span><span class="w"> </span><span class="n">top</span>
+<span class="w"> </span><span class="n">AUXILIARY</span><span class="w"> </span><span class="n">MAY</span><span class="w"> </span><span class="n">authorizedService</span><span class="w"> </span><span class="o">)</span>
+<span class="n">olcObjectClasses</span><span class="o">:</span><span class="w"> </span><span class="o">{</span><span class="mi">1</span><span class="o">}(</span><span class="w"> </span><span class="mf">1.3</span><span class="o">.</span><span class="mf">6.1</span><span class="o">.</span><span class="mf">4.1</span><span class="o">.</span><span class="mf">5322.17</span><span class="o">.</span><span class="mf">1.2</span><span class="w"> </span><span class="n">NAME</span><span class="w"> </span><span class="s1">&#39;hostObject&#39;</span><span class="w"> </span><span class="n">DESC</span><span class="w"> </span><span class="s1">&#39;Auxilia</span>
+<span class="s1"> ry object class for adding host attribute&#39;</span><span class="w"> </span><span class="n">SUP</span><span class="w"> </span><span class="n">top</span><span class="w"> </span><span class="n">AUXILIARY</span><span class="w"> </span><span class="n">MAY</span><span class="w"> </span><span class="n">host</span><span class="w"> </span><span class="o">)</span>
+
+
+<span class="c1">//add the ldapns schema</span>
+<span class="n">ldapadd</span><span class="w"> </span><span class="o">-</span><span class="n">f</span><span class="w"> </span><span class="o">./</span><span class="n">ldif_output</span><span class="sr">/cn\=config/cn\=schema/</span><span class="n">cn</span><span class="o">\=\{</span><span class="mi">12</span><span class="o">\}</span><span class="n">ldapns</span><span class="o">.</span><span class="na">ldif</span><span class="w">  </span><span class="o">-</span><span class="n">D</span><span class="w"> </span><span class="n">cn</span><span class="o">=</span><span class="n">admin</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span><span class="w"> </span><span class="o">-</span><span class="n">x</span><span class="w"> </span><span class="o">-</span><span class="n">W</span>
+</code></pre></div>
+
+<h2>SSL</h2>
+<h3>Generate ssl cert</h3>
+<p>I had previously setup a procedure creating and self-signing certs. A good set of instructions can be found here : <a href="http://www.flatmtn.com/article/setting-openssl-create-certificates">Flat Mountain, "Setting up OpenSSL to Create Certificates", http://www.flatmtn.com/article/setting-openssl-create-certificates</a>  </p>
+<p>Generate .pem format ssl key &amp; cert for the heartbeat fqdn. </p>
+<div class="highlight"><pre><span></span><code><span class="c1">//I ran this in my ssl work dir, </span>
+<span class="n">openssl</span><span class="w"> </span><span class="n">req</span><span class="w"> </span><span class="o">-</span><span class="n">new</span><span class="w"> </span><span class="o">-</span><span class="n">nodes</span><span class="w"> </span><span class="o">-</span><span class="n">out</span><span class="w">  </span><span class="n">ldap</span><span class="p">.</span><span class="n">example</span><span class="p">.</span><span class="n">tld</span><span class="p">.</span><span class="n">req</span><span class="p">.</span><span class="n">pem</span><span class="w"> </span><span class="o">-</span><span class="n">keyout</span><span class="w"> </span><span class="n">private</span><span class="o">/</span><span class="n">ldap</span><span class="p">.</span><span class="n">example</span><span class="p">.</span><span class="n">tld</span><span class="p">.</span><span class="n">key</span><span class="p">.</span><span class="n">pem</span><span class="w"> </span><span class="o">-</span><span class="n">days</span><span class="w"> </span><span class="mi">365</span><span class="w"> </span><span class="o">-</span><span class="n">config</span><span class="w"> </span><span class="o">./</span><span class="n">openssl</span><span class="p">.</span><span class="n">cnf</span>
+<span class="n">openssl</span><span class="w"> </span><span class="n">ca</span><span class="w"> </span><span class="o">-</span><span class="n">out</span><span class="w"> </span><span class="n">ldap</span><span class="p">.</span><span class="n">example</span><span class="p">.</span><span class="n">tld</span><span class="p">.</span><span class="n">cert</span><span class="p">.</span><span class="n">pem</span><span class="w"> </span><span class="o">-</span><span class="n">days</span><span class="w"> </span><span class="mi">365</span><span class="w"> </span><span class="o">-</span><span class="n">config</span><span class="w"> </span><span class="o">./</span><span class="n">openssl</span><span class="p">.</span><span class="n">cnf</span><span class="w"> </span><span class="o">-</span><span class="n">infiles</span><span class="w"> </span><span class="n">ldap</span><span class="p">.</span><span class="n">example</span><span class="p">.</span><span class="n">tld</span><span class="p">.</span><span class="n">req</span><span class="p">.</span><span class="n">pem</span>
+</code></pre></div>
+
+<p>Copy the crt and key to the ldap servers into /etc/ldap/ssl - you'll have to create this directory.
+    //on ldap servers
+    mkdir /etc/ldap/ssl</p>
+<p>Update the crt and key ownership and file permissions.</p>
+<div class="highlight"><pre><span></span><code><span class="c1">//on ldap servers</span>
+<span class="n">chmod</span><span class="w"> </span><span class="mi">640</span><span class="w"> </span><span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">ldap</span><span class="o">/</span><span class="n">ssl</span><span class="o">/*</span>
+<span class="n">chown</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">openldap</span><span class="w"> </span><span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">ldap</span><span class="o">/</span><span class="n">ssl</span><span class="o">/*</span>
+</code></pre></div>
+
+<p>On ldap01 create a file 'tls.ldif'</p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">olcTLSCACertificateFile</span>
+<span class="n">olcTLSCACertificateFile</span><span class="o">:</span><span class="w"> </span><span class="sr">/etc/ssl/certs/</span><span class="n">exampleCA</span><span class="o">.</span><span class="na">crt</span>
+<span class="o">-</span>
+<span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">olcTLSCertificateFile</span>
+<span class="n">olcTLSCertificateFile</span><span class="o">:</span><span class="w"> </span><span class="sr">/etc/ldap/ssl/</span><span class="n">ldap</span><span class="o">.</span><span class="na">example</span><span class="o">.</span><span class="na">tld</span><span class="o">.</span><span class="na">cert</span><span class="o">.</span><span class="na">pem</span>
+<span class="o">-</span>
+<span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">olcTLSCertificateKeyFile</span>
+<span class="n">olcTLSCertificateKeyFile</span><span class="o">:</span><span class="w"> </span><span class="sr">/etc/ldap/ssl/</span><span class="n">ldap</span><span class="o">.</span><span class="na">example</span><span class="o">.</span><span class="na">tld</span><span class="o">.</span><span class="na">key</span><span class="o">.</span><span class="na">pem</span>
+</code></pre></div>
+
+<p>Run:  <code>ldapmodify -f tls.ldif -D cn=admin,cn=config -x -W</code></p>
+<p>Update slapd defaults in <code>/etc/default/slapd</code></p>
+<div class="highlight"><pre><span></span><code>SLAPD_SERVICES=&quot;ldap://127.0.0.1:389/ ldaps:/// ldapi:///&quot;
+</code></pre></div>
+
+<p>Restart slapd and test</p>
+<div class="highlight"><pre><span></span><code>gnutls-cli-debug -p 636 127.0.0.1
+</code></pre></div>
+
+<h2>Import Schemata</h2>
+<h2>Modules</h2>
+<h3>ppolicy</h3>
+<p>The ppolicy overlay adds more controls (password aging, reuse, timeouts, etc) over the backend database.
+For more info read the man page for slapo-ppolicy</p>
+<p>There are three steps:</p>
+<ul>
+<li>enable and configure openLDAP ppolicy module</li>
+<li>import ppolicy schema and overlay</li>
+<li>apply default policies</li>
+</ul>
+<p>Create <code>ppolicy_module.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">cn</span><span class="o">=</span><span class="n">module</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">olcModuleList</span>
+<span class="n">cn</span><span class="o">:</span><span class="w"> </span><span class="n">module</span>
+<span class="n">olcModulePath</span><span class="o">:</span><span class="w"> </span><span class="sr">/usr/lib/</span><span class="n">ldap</span>
+<span class="n">olcModuleLoad</span><span class="o">:</span><span class="w"> </span><span class="n">ppolicy</span>
+</code></pre></div>
+
+<p>Create <code>ou_policies.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">ou</span><span class="o">=</span><span class="n">policies</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">example</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">tld</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">top</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">organizationalUnit</span>
+<span class="n">ou</span><span class="o">:</span><span class="w"> </span><span class="n">policies</span>
+</code></pre></div>
+
+<p>Create <code>default.policies.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">cn</span><span class="o">=</span><span class="k">default</span><span class="o">,</span><span class="n">ou</span><span class="o">=</span><span class="n">policies</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">example</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">tld</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">top</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">device</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">pwdPolicy</span>
+<span class="n">cn</span><span class="o">:</span><span class="w"> </span><span class="k">default</span>
+<span class="n">pwdAttribute</span><span class="o">:</span><span class="w"> </span><span class="n">userPassword</span>
+<span class="n">pwdMaxAge</span><span class="o">:</span><span class="w"> </span><span class="mi">7776000</span>
+<span class="n">pwdExpireWarning</span><span class="o">:</span><span class="w"> </span><span class="mi">604800</span>
+<span class="n">pwdInHistory</span><span class="o">:</span><span class="w"> </span><span class="mi">13</span>
+<span class="n">pwdCheckQuality</span><span class="o">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="n">pwdMinLength</span><span class="o">:</span><span class="w"> </span><span class="mi">14</span>
+<span class="n">pwdMaxFailure</span><span class="o">:</span><span class="w"> </span><span class="mi">5</span>
+<span class="n">pwdLockout</span><span class="o">:</span><span class="w"> </span><span class="n">TRUE</span>
+<span class="n">pwdLockoutDuration</span><span class="o">:</span><span class="w"> </span><span class="mi">1800</span>
+<span class="n">pwdGraceAuthNLimit</span><span class="o">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">pwdFailureCountInterval</span><span class="o">:</span><span class="w"> </span><span class="mi">1800</span>
+<span class="n">pwdMustChange</span><span class="o">:</span><span class="w"> </span><span class="n">TRUE</span>
+<span class="n">pwdAllowUserChange</span><span class="o">:</span><span class="w"> </span><span class="n">TRUE</span>
+<span class="n">pwdSafeModify</span><span class="o">:</span><span class="w"> </span><span class="n">FALSE</span>
+</code></pre></div>
+
+<p>Create <code>ppolicy_overlay.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">olcOverlay</span><span class="o">=</span><span class="n">ppolicy</span><span class="o">,</span><span class="n">olcDatabase</span><span class="o">={</span><span class="mi">1</span><span class="o">}</span><span class="n">hdb</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">olcOverlayConfig</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">olcPPolicyConfig</span>
+<span class="n">olcOverlay</span><span class="o">:</span><span class="w"> </span><span class="n">ppolicy</span>
+<span class="n">olcPPolicyDefault</span><span class="o">:</span><span class="w"> </span><span class="n">cn</span><span class="o">=</span><span class="k">default</span><span class="o">,</span><span class="n">ou</span><span class="o">=</span><span class="n">policies</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">example</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">tld</span>
+<span class="n">olcPPolicyHashCleartext</span><span class="o">:</span><span class="w"> </span><span class="n">TRUE</span>
+<span class="n">olcPPolicyUseLockout</span><span class="o">:</span><span class="w"> </span><span class="n">TRUE</span>
+</code></pre></div>
+
+<p>Get the schema</p>
+<p>Add these to the running config</p>
+<div class="highlight"><pre><span></span><code>ldapadd -f ppolicy_module.ldif  -D cn=admin,cn=config -x -W
+ldapadd -f ou_policies.ldif  -D cn=admin,dc=example,dc=tld -x -W
+</code></pre></div>
+
+<p>Now restart slapd,</p>
+<p>Add the schema and db overlay.</p>
+<div class="highlight"><pre><span></span><code>ldapadd -f ppolicy_schema.ldif  -D cn=admin,cn=config -x -W
+ldapadd -f ppolicy_overlay.ldif  -D cn=admin,cn=config -x -W
+</code></pre></div>
+
+<p>Add your default policies</p>
+<div class="highlight"><pre><span></span><code>ldapadd -f default.policies.ldif  -D cn=admin,dc=example,dc=tld -x -W
+</code></pre></div>
+
+<p>Client Side Config:</p>
+<div class="highlight"><pre><span></span><code>?
+</code></pre></div>
+
+<p>References:</p>
+<ul>
+<li><a href="http://theslashroot.blogspot.com/2011/12/openldap-with-ppolicy.html">theslashroot.blogspot.com, "OpenLDAP with ppolicy", http://theslashroot.blogspot.com/2011/12/openldap-with-ppolicy.html</a></li>
+</ul>
+<h3>memberof</h3>
+<p><em>I use this for openvpn.</em>  </p>
+<p>Create <code>memberof_modules.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">cn</span><span class="o">=</span><span class="n">module</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">olcModuleList</span>
+<span class="n">olcModulePath</span><span class="o">:</span><span class="w"> </span><span class="sr">/usr/lib/</span><span class="n">ldap</span>
+<span class="n">cn</span><span class="o">:</span><span class="w"> </span><span class="n">module</span>
+<span class="n">olcModuleLoad</span><span class="o">:</span><span class="w"> </span><span class="n">memberof</span>
+</code></pre></div>
+
+<p>Create <code>memberof_overlay</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">olcOverlay</span><span class="o">=</span><span class="n">memberof</span><span class="o">,</span><span class="n">olcDatabase</span><span class="o">={</span><span class="mi">1</span><span class="o">}</span><span class="n">hdb</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">olcMemberOf</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">olcOverlayConfig</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">olcConfig</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">top</span>
+<span class="n">olcOverlay</span><span class="o">:</span><span class="w"> </span><span class="n">memberof</span>
+<span class="n">olcMemberOfDangling</span><span class="o">:</span><span class="w"> </span><span class="n">ignore</span>
+<span class="n">olcMemberOfRefInt</span><span class="o">:</span><span class="w"> </span><span class="n">FALSE</span>
+</code></pre></div>
+
+<p>Enable the module and add the overlay</p>
+<div class="highlight"><pre><span></span><code>ldapadd -f memberof_module.ldif -D cn=admin,cn=config -x -W
+ldapadd -f memberof_overlay.ldif -D cn=admin,cn=config -x -W
+</code></pre></div>
+
+<p>Restart slapd.</p>
+<h3>Indexes</h3>
+<p>There are instruction here : <a href="http://wiki.debian.org/LDAP/OpenLDAPSetup#with_cn.3Dconfig">Debian LDAP Wiki, 'Setting up an LDAP server with OpenLDAP',http://wiki.debian.org/LDAP/OpenLDAPSetup#with_cn.3Dconfig (as of July 6th, 2012 20:00 UTC)</a></p>
+<h3>Replication</h3>
+<p>Create a user for syncing.  use slapcat to generate the password.</p>
+<p><code>syncagent.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">cn</span><span class="o">=</span><span class="n">syncagent</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">example</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">tld</span>
+<span class="n">cn</span><span class="o">:</span><span class="w"> </span><span class="n">syncagent</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">top</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">person</span>
+<span class="n">sn</span><span class="o">:</span><span class="w"> </span><span class="n">syncagent</span>
+<span class="n">userPassword</span><span class="o">:</span><span class="w"> </span><span class="o">{</span><span class="n">SSHA</span><span class="o">}</span><span class="n">SAYXXXXXXXXXXXXXXXXXXXXXXXX</span>
+</code></pre></div>
+
+<p>Run : <code>ldapadd -f syncagent.ldif -D cn=admin,dc=example,dc=tld -x -W</code></p>
+<p>Add indexes <code>olcDbIndex2.ldif</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">olcDatabase</span><span class="o">={</span><span class="mi">1</span><span class="o">}</span><span class="n">hdb</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">changetype</span><span class="o">:</span><span class="w"> </span><span class="n">modify</span>
+<span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">olcDbIndex</span>
+<span class="n">olcDbIndex</span><span class="o">:</span><span class="w"> </span><span class="n">entryUUID</span><span class="o">,</span><span class="n">entryCSN</span><span class="w"> </span><span class="n">eq</span>
+</code></pre></div>
+
+<p>Run : <code>ldapadd -f olcDbIndex2.ldif -D cn=admin,cn=config -x -W</code></p>
+<div class="highlight"><pre><span></span><code>#<span class="w"> </span><span class="nv">mostly</span><span class="w"> </span><span class="nv">cribbed</span><span class="w"> </span><span class="nv">from</span><span class="w"> </span><span class="nv">http</span>:<span class="o">//</span><span class="nv">wiki</span>.<span class="nv">ucc</span>.<span class="nv">asn</span>.<span class="nv">au</span><span class="o">/</span><span class="nv">LDAP</span><span class="o">/</span><span class="nv">LazySysadmin</span>#<span class="nv">Single</span><span class="o">-</span><span class="nv">master_with_</span>.<span class="mi">60</span><span class="nv">cn</span>.<span class="mi">3</span><span class="nv">Dconfig</span>.<span class="mi">60</span><span class="nv">_replication</span>
+<span class="nv">version</span>:<span class="w"> </span><span class="mi">1</span>
+
+<span class="nv">dn</span>:<span class="w"> </span><span class="nv">cn</span><span class="o">=</span><span class="nv">config</span>
+<span class="nv">changetype</span>:<span class="w"> </span><span class="nv">modify</span>
+<span class="nv">add</span>:<span class="w"> </span><span class="nv">olcServerID</span>
+<span class="nv">olcServerID</span>:<span class="w"> </span><span class="mi">001</span><span class="w"> </span><span class="nv">ldaps</span>:<span class="o">//</span><span class="nv">ldap01</span>.<span class="nv">example</span>.<span class="nv">tld</span>
+<span class="nv">olcServerID</span>:<span class="w"> </span><span class="mi">002</span><span class="w"> </span><span class="nv">ldaps</span>:<span class="o">//</span><span class="nv">ldap02</span>.<span class="nv">example</span>.<span class="nv">tld</span>
+
+<span class="nv">dn</span>:<span class="w"> </span><span class="nv">cn</span><span class="o">=</span><span class="nv">module</span>{<span class="mi">0</span>},<span class="nv">cn</span><span class="o">=</span><span class="nv">config</span>
+<span class="nv">changetype</span>:<span class="w"> </span><span class="nv">modify</span>
+<span class="nv">add</span>:<span class="w"> </span><span class="nv">olcModuleLoad</span>
+<span class="nv">olcModuleLoad</span>:<span class="w"> </span><span class="nv">syncprov</span>
+
+#<span class="w"> </span><span class="nv">Enable</span><span class="w"> </span><span class="nv">the</span><span class="w"> </span><span class="nv">syncprov</span><span class="w"> </span><span class="nv">overlay</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nv">cn</span><span class="o">=</span><span class="nv">config</span>
+<span class="nv">dn</span>:<span class="w"> </span><span class="nv">olcOverlay</span><span class="o">=</span><span class="nv">syncprov</span>,<span class="nv">olcDatabase</span><span class="o">=</span>{<span class="mi">0</span>}<span class="nv">config</span>,<span class="nv">cn</span><span class="o">=</span><span class="nv">config</span>
+<span class="nv">changetype</span>:<span class="w"> </span><span class="nv">add</span>
+<span class="nv">objectClass</span>:<span class="w"> </span><span class="nv">olcOverlayConfig</span>
+<span class="nv">objectClass</span>:<span class="w"> </span><span class="nv">olcSyncProvConfig</span>
+<span class="nv">olcOverlay</span>:<span class="w"> </span><span class="nv">syncprov</span>
+
+#<span class="w"> </span><span class="nv">Setup</span><span class="w"> </span><span class="nv">Access</span>
+<span class="nv">dn</span>:<span class="w"> </span><span class="nv">olcDatabase</span><span class="o">=</span>{<span class="mi">0</span>}<span class="nv">config</span>,<span class="nv">cn</span><span class="o">=</span><span class="nv">config</span>
+<span class="nv">changetype</span>:<span class="w"> </span><span class="nv">modify</span>
+<span class="nv">add</span>:<span class="w"> </span><span class="nv">olcAccess</span>
+<span class="nv">olcAccess</span>:<span class="w"> </span><span class="nv">to</span><span class="w"> </span><span class="o">*</span><span class="w">  </span><span class="nv">by</span><span class="w"> </span><span class="nv">dn</span>.<span class="nv">base</span><span class="o">=</span><span class="s2">&quot;cn=syncagent,dc=example,dc=com&quot;</span><span class="w"> </span><span class="nv">read</span><span class="w">  </span><span class="nv">by</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="o">+</span><span class="mi">0</span><span class="w"> </span><span class="k">break</span>
+</code></pre></div>
+
+<p>Run <code>ldapmodify -Y EXTERNAL -H ldapi:/// -D cn=config -f ./repl_master.ldif</code></p>
+<p>On ldap02, setup config replication</p>
+<p>Create <code>repl_config_slave.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">olcDatabase</span><span class="o">={</span><span class="mi">0</span><span class="o">}</span><span class="n">config</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">changetype</span><span class="o">:</span><span class="w"> </span><span class="n">modify</span>
+<span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">olcSyncrepl</span>
+<span class="n">olcSyncrepl</span><span class="o">:</span><span class="w"> </span><span class="o">{</span><span class="mi">0</span><span class="o">}</span><span class="n">rid</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="n">provider</span><span class="o">=</span><span class="n">ldaps</span><span class="o">://</span><span class="n">ldap01</span><span class="o">.</span><span class="na">example</span><span class="o">.</span><span class="na">tld</span>
+<span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="n">refreshAndPersist</span><span class="w"> </span><span class="n">bindmethod</span><span class="o">=</span><span class="n">simple</span><span class="w"> </span><span class="n">binddn</span><span class="o">=</span><span class="s2">&quot;cn=syncagent,dc=example,dc=net&quot;</span><span class="w"> </span><span class="n">credentials</span><span class="o">=</span><span class="n">PASSWORD</span><span class="w"> </span><span class="n">retry</span><span class="o">=</span><span class="s2">&quot;5 5 300 5&quot;</span><span class="w"> </span><span class="n">timeout</span><span class="o">=</span><span class="mi">1</span><span class="w">  </span><span class="n">tls_reqcert</span><span class="o">=</span><span class="n">never</span>
+<span class="w"> </span><span class="n">searchbase</span><span class="o">=</span><span class="s2">&quot;cn=config&quot;</span>
+</code></pre></div>
+
+<p>Note: I have <code>tls_reqcert=never</code> because my certs are for ldap.example.net, which resolves to the virtual ip for HA</p>
+<p>Run <code>ldapmodify -Y EXTERNAL -H ldapi:/// -D cn=config -f ./repl_conf_slave.ldif</code></p>
+<p>Setup database replication</p>
+<p><em>I could not get the next two changes to apply from one file. I tried it as two seperate files and perhaps found and fixed my typo (a line break before searchbase.  It may work for you as one file</em></p>
+<p>Create <code>repl_db_slave_auth.ldif</code></p>
+<div class="highlight"><pre><span></span><code>#<span class="w"> </span><span class="nv">Enable</span><span class="w"> </span><span class="nv">the</span><span class="w"> </span><span class="nv">syncprov</span><span class="w"> </span><span class="nv">overlay</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nv">olcDatabase</span><span class="o">=</span>{<span class="mi">1</span>}<span class="nv">hdb</span>,<span class="nv">cn</span><span class="o">=</span><span class="nv">config</span>
+<span class="nv">dn</span>:<span class="w"> </span><span class="nv">olcOverlay</span><span class="o">=</span><span class="nv">syncprov</span>,<span class="nv">olcDatabase</span><span class="o">=</span>{<span class="mi">1</span>}<span class="nv">hdb</span>,<span class="nv">cn</span><span class="o">=</span><span class="nv">config</span>
+<span class="nv">changetype</span>:<span class="w"> </span><span class="nv">add</span>
+<span class="nv">objectClass</span>:<span class="w"> </span><span class="nv">olcOverlayConfig</span>
+<span class="nv">objectClass</span>:<span class="w"> </span><span class="nv">olcSyncProvConfig</span>
+<span class="nv">olcOverlay</span>:<span class="w"> </span><span class="nv">syncprov</span>
+<span class="o">--</span>
+<span class="nv">dn</span>:<span class="w"> </span><span class="nv">olcDatabase</span><span class="o">=</span>{<span class="mi">1</span>}<span class="nv">hdb</span>,<span class="nv">cn</span><span class="o">=</span><span class="nv">config</span>
+<span class="nv">changetype</span>:<span class="w"> </span><span class="nv">modify</span>
+<span class="nv">add</span>:<span class="w"> </span><span class="nv">olcAccess</span>
+<span class="nv">olcAccess</span>:<span class="w"> </span><span class="nv">to</span><span class="w"> </span><span class="o">*</span><span class="w">  </span><span class="nv">by</span><span class="w"> </span><span class="nv">dn</span>.<span class="nv">base</span><span class="o">=</span><span class="s2">&quot;cn=syncagent,dc=gge,dc=brilig,dc=net&quot;</span><span class="w"> </span><span class="nv">read</span><span class="w">  </span><span class="nv">by</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="o">+</span><span class="mi">0</span><span class="w"> </span><span class="k">break</span>
+</code></pre></div>
+
+<p>Create <code>repl_db_slave_sync.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">olcDatabase</span><span class="o">={</span><span class="mi">1</span><span class="o">}</span><span class="n">hdb</span><span class="o">,</span><span class="n">cn</span><span class="o">=</span><span class="n">config</span>
+<span class="n">changetype</span><span class="o">:</span><span class="w"> </span><span class="n">modify</span>
+<span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">olcSyncrepl</span>
+<span class="n">olcSyncrepl</span><span class="o">:</span><span class="w"> </span><span class="o">{</span><span class="mi">0</span><span class="o">}</span><span class="n">rid</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="n">provider</span><span class="o">=</span><span class="n">ldaps</span><span class="o">://</span><span class="n">ldap01</span><span class="o">.</span><span class="na">example</span><span class="o">.</span><span class="na">tld</span><span class="w"> </span>
+<span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="n">refreshAndPersist</span><span class="w"> </span><span class="n">bindmethod</span><span class="o">=</span><span class="n">simple</span><span class="w"> </span><span class="n">binddn</span><span class="o">=</span><span class="s2">&quot;cn=syncagent,dc=example,dc=tld&quot;</span><span class="w"> </span><span class="n">credentials</span><span class="o">=</span><span class="n">PASSWORD</span><span class="w"> </span><span class="n">retry</span><span class="o">=</span><span class="s2">&quot;5 5 300 5&quot;</span><span class="w"> </span><span class="n">timeout</span><span class="o">=</span><span class="mi">1</span><span class="w">  </span><span class="n">tls_reqcert</span><span class="o">=</span><span class="n">never</span><span class="w"> </span><span class="n">searchbase</span><span class="o">=</span><span class="s2">&quot;dc=example,dc=tld&quot;</span>
+</code></pre></div>
+
+<p>Run <code>ldapmodify -Y EXTERNAL -H ldapi:/// -D olcDatabase={1}hdb,cn=config -f ./repl_db_slave_auth.ldif</code></p>
+<p>Run <code>ldapmodify -Y EXTERNAL -H ldapi:/// -D olcDatabase={1}hdb,cn=config -f ./repl_db_slave_sync.ldif</code></p>
+<p>Now test your replication by creating some basic entries</p>
+<p>On ldap01 create <code>ou.ldif</code></p>
+<div class="highlight"><pre><span></span><code><span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">ou</span><span class="o">=</span><span class="n">people</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">example</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">tld</span>
+<span class="n">ou</span><span class="o">:</span><span class="w"> </span><span class="n">people</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">organizationalUnit</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">top</span>
+
+<span class="n">dn</span><span class="o">:</span><span class="w"> </span><span class="n">ou</span><span class="o">=</span><span class="n">group</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">example</span><span class="o">,</span><span class="n">dc</span><span class="o">=</span><span class="n">tld</span>
+<span class="n">ou</span><span class="o">:</span><span class="w"> </span><span class="n">group</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">organizationalUnit</span>
+<span class="n">objectClass</span><span class="o">:</span><span class="w"> </span><span class="n">top</span>
+</code></pre></div>
+
+<p>Run <code>ldapadd -H ldap://127.0.0.1 -f ou.ldif  -D cn=admin,dc=example,dc=tld -x -W</code></p>
+<p>On ldap02:</p>
+<p>Test with <code>ldapsearch -H ldap://127.0.0.1/ -x -b dc=example,dc=tld</code></p>
+<p>References:</p>
+<ul>
+<li><a href="http://wiki.ucc.asn.au/LDAP/LazySysadmin#Single-master_with_.60cn.3Dconfig.60_replication">University Computer Club Wiki, "LDAP/LazySysadmin", http://wiki.ucc.asn.au/LDAP/LazySysadmin</a></li>
+<li><a href="http://www.openldap.org/doc/admin24/replication.html">OpenLDAP Software 2.3 Administrator's Guide, "Replication", http://www.openldap.org/doc/admin24/replication.html</a></li>
+<li><a href="http://erralt.wordpress.com/2010/01/19/openldap-syncrepl-via-tls-ssl/">"Erralt", "OpenLDAP, syncrepl via TLS/SSL", http://erralt.wordpress.com/2010/01/19/openldap-syncrepl-via-tls-ssl/</a></li>
+</ul>
+<h2>Linux-HA/heartbeat</h2>
+<p>References:</p>
+<ul>
+<li><a href="http://www.linuxjournal.com/article/5505">Allen, Jay D., and and Cliff White. "Highly Available LDAP". Linux Journal, December 2002. http://www.linuxjournal.com/article/5505</a></li>
+</ul>
+<h2>Monitoring</h2>
+<h3>Monitoring ldap</h3>
+<h4>openLDAP state</h4>
+<ul>
+<li><a href="http://www.openldap.org/devel/admin/monitoringslapd.html">OpenLDAP Software 2.3 Administrator's Guide, "Monitoring", http://www.openldap.org/devel/admin/monitoringslapd.html</a></li>
+</ul>
+<h3>Monitoring syncrepl</h3>
+<p>I found a couple of post referencing a perl script and hobbit.  The original source of the script is long gone but i found the script and saved it as this <a href="https://gist.github.com/3072089#file_bb_openldap.pl">gist, "file_bb_openldap.pl", https://gist.github.com/3072089#file_bb_openldap.pl</a>.</p>
+<h4>Nagios plugin</h4>
+<ul>
+<li><a href="http://ltb-project.org/wiki/documentation/nagios-plugins/check_ldap_syncrepl_status">LDAP Tool Box project, "Check Syncrepl status", http://ltb-project.org/wiki/documentation/nagios-plugins/check_ldap_syncrepl_status</a></li>
+</ul>
+<h3>heartbeat</h3>
+<p>(soon)</p>
+            </div>
+            <!-- /.entry-content -->
+        </article>
+    </section>
+
+        </div>
+        <div class="col-sm-3" id="sidebar">
+            <aside>
+<!-- Sidebar -->
+<section class="well well-sm">
+  <ul class="list-group list-group-flush">
+
+<!-- Sidebar/Categories -->
+<li class="list-group-item">
+  <h4><i class="fa fa-home fa-lg"></i><span class="icon-label">Categories</span></h4>
+  <ul class="list-group" id="categories">
+    <li class="list-group-item">
+      <a href="https://grungelabs.com/category/auth.html"><i class="fa fa-folder-open fa-lg"></i>auth</a>
+    </li>
+  </ul>
+</li>
+<!-- End Sidebar/Categories -->
+
+<!-- Sidebar/Links -->
+<li class="list-group-item">
+  <h4><i class="fa fa-external-link-square fa-lg"></i><span class="icon-label">Links</span></h4>
+  <ul class="list-group" id="links">
+    <li class="list-group-item">
+      <a href="http://getpelican.com/" target="_blank">Pelican</a>
+    </li>
+    <li class="list-group-item">
+      <a href="http://python.org/" target="_blank">Python.org</a>
+    </li>
+    <li class="list-group-item">
+      <a href="http://jinja.pocoo.org/" target="_blank">Jinja2</a>
+    </li>
+  </ul>
+</li>
+<!-- End Sidebar/Links -->
+  </ul>
+</section>
+<!-- End Sidebar -->            </aside>
+        </div>
+    </div>
+</div>
+<!-- End Content Container -->
+
+<footer>
+   <div class="container">
+      <hr>
+      <div class="row">
+         <div class="col-xs-10">&copy; 2014 Fahd Sultan
+            &middot; Powered by <a href="https://github.com/getpelican/pelican-themes/tree/master/pelican-bootstrap3" target="_blank">pelican-bootstrap3</a>,
+            <a href="http://docs.getpelican.com/" target="_blank">Pelican</a>,
+            <a href="http://getbootstrap.com" target="_blank">Bootstrap</a>         </div>
+         <div class="col-xs-2"><p class="pull-right"><i class="fa fa-arrow-up"></i> <a href="#">Back to top</a></p></div>
+      </div>
+   </div>
+</footer>
+<script src="https://grungelabs.com/theme/js/jquery.min.js"></script>
+
+<!-- Include all compiled plugins (below), or include individual files as needed -->
+<script src="https://grungelabs.com/theme/js/bootstrap.min.js"></script>
+
+<!-- Enable responsive features in IE8 with Respond.js (https://github.com/scottjehl/Respond) -->
+<script src="https://grungelabs.com/theme/js/respond.min.js"></script>
+
+
+
+
+</body>
+</html>
